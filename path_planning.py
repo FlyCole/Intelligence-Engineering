@@ -43,7 +43,6 @@ class AStar(object):
         self.boundary = [self.width, self.height]
         print self.boundary
         self.map_grid = map
-        print self.map_grid > 0
 
 
     def h_value(self, child_node):
@@ -52,7 +51,8 @@ class AStar(object):
         :param child_node:
         :return:
         """
-        h = abs(child_node[0] - self.goal[0]) + abs(child_node[1] - self.goal[1])
+        h = (child_node[0] - self.goal[0]) ** 2 + (child_node[1] - self.goal[1]) ** 2
+        # h = abs(child_node[0] - self.goal[0]) + abs(child_node[1] - self.goal[1])
         return h
 
     def g_value(self, child_node, father_node):
@@ -180,6 +180,7 @@ class AStar(object):
         h0 = self.h_value(current)
         init_open = [current[0], current[1], 0, 0, 0, h0]
         self.open = numpy.column_stack((self.open, init_open))
+        print self.open
 
         iter = 1
         while iter:

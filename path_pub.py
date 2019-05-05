@@ -137,8 +137,9 @@ class path_pub():
         # self.best_path[1, :] = (1248 - self.best_path[1, :]) * self.resolution
         # self.best_path[0, :] += self.pos_x
         # self.best_path[1, :] += self.pos_y
-        self.best_path[0, :] = self.best_path[0, :] * self.resolution + self.pos_x
-        self.best_path[1, :] = self.best_path[1, :] * self.resolution + self.pos_y
+        curr = self.best_path[1, :] * self.resolution + self.pos_x
+        self.best_path[1, :] = self.best_path[0, :] * self.resolution + self.pos_y
+        self.best_path[0, :] = curr
         print self.best_path
         # rospy.sleep(2)
         for i in range(len(self.best_path[0, :])):
@@ -174,10 +175,12 @@ class path_pub():
         # start[1] = self.map_msg.info.height - (start[1] - self.pos_y) // 0.05
         # goal[0] = (goal[0] - self.pos_x) // 0.05
         # goal[1] = self.map_msg.info.height - (goal[1] - self.pos_y) // 0.05
-        start[0] = (start[0] - self.pos_x) // self.resolution
-        start[1] = (start[1] - self.pos_y) // self.resolution
-        goal[0] = (goal[0] - self.pos_x) // self.resolution
-        goal[1] = (goal[1] - self.pos_y) // self.resolution
+        k = (start[1] - self.pos_y) // self.resolution
+        start[1] = (start[0] - self.pos_x) // self.resolution
+        start[0] = k
+        k = (goal[1] - self.pos_y) // self.resolution
+        goal[1] = (goal[0] - self.pos_x) // self.resolution
+        goal[0] = k
         return start, goal
 if __name__ == '__main__':
     path_pub()
