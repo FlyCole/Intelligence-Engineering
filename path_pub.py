@@ -1,5 +1,13 @@
-#! /usr/bin/env python
-# -*- encoding: UTF-8 -*-
+# !/usr/bin/env python
+# -*-coding:utf-8-*-
+"""
+    Author: Yifei Ren
+    Function: Publish the path calculated by A-star algorithm
+    Version: 1.0
+    Date: 04/05/2019
+"""
+
+
 import rospy
 import numpy as np
 import thread
@@ -7,14 +15,16 @@ import path_planning
 from math import floor
 import math
 from nav_msgs.msg import Path, OccupancyGrid, MapMetaData
-from geometry_msgs.msg import PoseStamped, Quaternion, PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseStamped, Quaternion, PoseWithCovarianceStamped, Twist
 import tf
 from tf import transformations
 import time
+from std_msgs.msg import Header
 
 
 class path_pub():
     def __init__(self):
+        rospy.init_node("path_pub")
         self.x = 0.0
         self.y = 0.0
         self.th = 0.0
@@ -25,16 +35,25 @@ class path_pub():
         self.pos_y = 0
         self.resolution = 0
         self.Map = []
-
+        self.br = tf.TransformBroadcaster()
+        self.trans = None
+        self.rot = None
         self.if_start_find_path = False
         self.if_find = 0
+        self.trans = None
+        self.rot = None
+        # self.listener = tf.TransformListener()
         self.goal_pose = PoseStamped()
         self.init_pose = PoseWithCovarianceStamped()
+        self.listener = tf.TransformListener()
+        self.listener.waitForTransform("/odom", "/map", rospy.Time(0), rospy.Duration(4.0))
+
+
         self.init_pose_sub = rospy.Subscriber("/initialpose", PoseWithCovarianceStamped, self.init_pose_callback)
+        # self.trans, self.rot = self.listener.lookupTransform('odom', 'map', rospy.Time(0))
         self.goal_pose_sub = rospy.Subscriber("/move_base_simple/goal", PoseStamped, self.goal_pose_callback)
 
 
-        rospy.init_node("path_pub")
         self.path_pub = rospy.Publisher("/path", Path, queue_size=15)
 
         self.map_metadata_sub = rospy.Subscriber("/map_metadata", MapMetaData, self.get_map_data_callback)
@@ -47,6 +66,8 @@ class path_pub():
         self.map_metadata = MapMetaData()
         self.last_time = rospy.get_rostime()
         self.best_path = np.array([])
+
+
 
         while self.if_find != 3:
             self.find_path()
@@ -66,6 +87,13 @@ class path_pub():
         # print "Start Point:"
         self.init_pose = msg
         self.if_find += 1
+        self.br.sendTransform((self.current_odom.pose.pose.position.x, self.current_odom.pose.pose.position.y,
+                               self.current_odom.pose.pose.position.z),
+                              (self.current_odom.pose.pose.orientation.x, self.current_odom.pose.pose.orientation.y,
+                               self.current_odom.pose.pose.orientation.z, self.current_odom.pose.pose.orientation.w),
+                              rospy.Time.now(),
+                              "odom",
+                              "map")
         print msg
 
     def goal_pose_callback(self, msg):
@@ -82,14 +110,14 @@ class path_pub():
 
     def map_callback(self, msg):
         # print msg.header
-        # print "------"
+        print "------"
         # print msg.info
         # print "------"
         # print len(msg.data)
         self.map_msg = msg
         raw = np.array(msg.data, dtype=np.int8)
         # print raw.shape
-        self.Map = raw.reshape(1248, 1152)
+        self.Map = raw.reshape(msg.info.height, msg.info.width)
 
     def find_path(self):
         if self.if_start_find_path:
@@ -152,6 +180,7 @@ class path_pub():
                 delta_y = self.best_path[1][i] - self.best_path[1][i-1]
                 th = math.atan2(delta_y, delta_x)
                 goal_quat = tf.transformations.quaternion_from_euler(0, 0, th)
+                current_pose.header.frame_id = "map"
                 current_pose.pose.position.x = self.best_path[0][i]
                 current_pose.pose.position.y = self.best_path[1][i]
                 current_pose.pose.position.z = 0
@@ -159,9 +188,23 @@ class path_pub():
                 current_pose.pose.orientation.y = goal_quat[1]
                 current_pose.pose.orientation.z = goal_quat[2]
                 current_pose.pose.orientation.w = goal_quat[3]
-                self.current_path.poses.append(current_pose)
+
+                odom_pose = self.listener.transformPose("odom", current_pose)
+
+                self.current_path.poses.append(odom_pose)
+
 
         print "Path planning over!!!!!!!!!!!!!!"
+
+
+        # try:
+        #     (self.trans, self.rot) = self.listener.lookupTransform('/odom', '/map', rospy.Time(0))
+        # except:
+        #     print "error"
+
+
+
+
         #print self.current_path.poses
         self.path_pub.publish(self.current_path)
         print "finish"
